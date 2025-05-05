@@ -19,5 +19,3 @@ class ClanBarberApp extends StatelessWidget {
     );
   }
 }
-
-
