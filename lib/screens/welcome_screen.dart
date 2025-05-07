@@ -55,7 +55,75 @@ class WelcomeScreen extends StatelessWidget {
                 // Botón login
                 ElevatedButton(
                   onPressed: () {
-                    // TODO: login
+                    final _formKey = GlobalKey<FormState>();
+                    String email = '';
+                    String password = '';
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return StatefulBuilder( // Necesario para modificar valores dentro del diálogo
+                          builder: (context, setState) {
+                            return AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              backgroundColor: const Color(0xFFF5F5DC),
+                              title: const Text('Iniciar sesión', style: TextStyle(fontWeight: FontWeight.bold)),
+                              content: Form(
+                                key: _formKey,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextFormField(
+                                      decoration: InputDecoration(
+                                        labelText: 'Correo electrónico',
+                                        prefixIcon: const Icon(Icons.email),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      keyboardType: TextInputType.emailAddress,
+                                      validator: (value) => value!.contains('@') ? null : 'Correo no válido',
+                                      onSaved: (value) => email = value!,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    TextFormField(
+                                      obscureText: true,
+                                      decoration: InputDecoration(
+                                        labelText: 'Contraseña',
+                                        prefixIcon: const Icon(Icons.lock),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      validator: (value) => value!.length < 6 ? 'Mínimo 6 caracteres' : null,
+                                      onSaved: (value) => password = value!,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancelar', style: TextStyle(color: Colors.brown)),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.brown[700],
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  ),
+                                  onPressed: () {
+                                    if (_formKey.currentState!.validate()) {
+                                      _formKey.currentState!.save();
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Email: $email\nPassword: $password')),
+                                      );
+                                      //TODO: logica real de autenticación
+                                    }
+                                  },
+                                  child: const Text('Entrar', style: TextStyle(color: Color(0xFFF5F5DC))),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.brown[700],

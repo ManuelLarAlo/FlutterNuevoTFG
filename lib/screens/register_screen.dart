@@ -11,8 +11,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
   String name = '';
+  String lastName = '';
   String email = '';
   String password = '';
+  String telefono = '';
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +47,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   onSaved: (value) => name = value!,
                   validator: (value) => value!.isEmpty ? 'Ingrese su nombre' : null,
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  decoration: InputDecoration(
+                    labelText: 'Apellidos',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onSaved: (value) => lastName = value!,
+                  validator: (value) => value!.isEmpty ? 'Ingrese sus apellidos' : null,
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Teléfono',
+                    prefixIcon: const Icon(Icons.phone),
+                    hintText: 'Ej. +34 600 123 456',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onSaved: (value) => telefono = value!,
+                  validator: (value) => value!.isEmpty ? 'Ingrese su número de teléfono' : null,
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
