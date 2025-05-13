@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "472204912075",
+    "project_id": "fluttertfg-3cec2",
+    "storage_bucket": "fluttertfg-3cec2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:472204912075:android:0cc3a630c9590eb21bc24e",
+        "android_client_info": {
+          "package_name": "com.example.clan_barber_club_andujar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPfNJkrTYWvDyBJeixgtDDrVBetxMu-Cg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

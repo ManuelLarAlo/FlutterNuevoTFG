@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
 
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,7 +29,7 @@ class WelcomeScreen extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: Image.asset(
-                    'barber_illustration.png', 
+                    'barber_illustration.png',
                     height: 200,
                   ),
                 ),
@@ -55,7 +61,7 @@ class WelcomeScreen extends StatelessWidget {
                 // Botón login
                 ElevatedButton(
                   onPressed: () {
-                    final _formKey = GlobalKey<FormState>();
+                    final formKey = GlobalKey<FormState>();
                     String email = '';
                     String password = '';
                     showDialog(
@@ -68,30 +74,36 @@ class WelcomeScreen extends StatelessWidget {
                               backgroundColor: const Color(0xFFF5F5DC),
                               title: const Text('Iniciar sesión', style: TextStyle(fontWeight: FontWeight.bold)),
                               content: Form(
-                                key: _formKey,
+                                key: formKey,
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    TextFormField(
-                                      decoration: InputDecoration(
-                                        labelText: 'Correo electrónico',
-                                        prefixIcon: const Icon(Icons.email),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    SizedBox(
+                                      width: 300,
+                                      child: TextFormField(
+                                        decoration: InputDecoration(
+                                          labelText: 'Correo electrónico',
+                                          prefixIcon: const Icon(Icons.email),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        keyboardType: TextInputType.emailAddress,
+                                        validator: (value) => value!.contains('@') ? null : 'Correo no válido',
+                                        onSaved: (value) => email = value!,
                                       ),
-                                      keyboardType: TextInputType.emailAddress,
-                                      validator: (value) => value!.contains('@') ? null : 'Correo no válido',
-                                      onSaved: (value) => email = value!,
                                     ),
                                     const SizedBox(height: 16),
-                                    TextFormField(
-                                      obscureText: true,
-                                      decoration: InputDecoration(
-                                        labelText: 'Contraseña',
-                                        prefixIcon: const Icon(Icons.lock),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    SizedBox(
+                                      width: 300,
+                                      child: TextFormField(
+                                        obscureText: true,
+                                        decoration: InputDecoration(
+                                          labelText: 'Contraseña',
+                                          prefixIcon: const Icon(Icons.lock),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        validator: (value) => value!.length < 6 ? 'Mínimo 6 caracteres' : null,
+                                        onSaved: (value) => password = value!,
                                       ),
-                                      validator: (value) => value!.length < 6 ? 'Mínimo 6 caracteres' : null,
-                                      onSaved: (value) => password = value!,
                                     ),
                                   ],
                                 ),
@@ -106,14 +118,33 @@ class WelcomeScreen extends StatelessWidget {
                                     backgroundColor: Colors.brown[700],
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                   ),
-                                  onPressed: () {
-                                    if (_formKey.currentState!.validate()) {
-                                      _formKey.currentState!.save();
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Email: $email\nPassword: $password')),
-                                      );
-                                      //TODO: logica real de autenticación
+                                  onPressed: () async {
+                                    if (formKey.currentState!.validate()) {
+                                      formKey.currentState!.save();
+                                      try {
+                                        await FirebaseAuth.instance.signInWithEmailAndPassword(
+                                          email: email,
+                                          password: password,
+                                        );
+
+                                        if (!mounted) return;
+
+                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          Navigator.pop(context);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Inicio de sesión exitoso')),
+                                          );
+                                          // Aquí podrías redirigir a la pantalla principal
+                                        });
+                                      } catch (e) {
+                                        if (!mounted) return;
+
+                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Error al iniciar sesión: ${e.toString()}')),
+                                          );
+                                        });
+                                      }
                                     }
                                   },
                                   child: const Text('Entrar', style: TextStyle(color: Color(0xFFF5F5DC))),
@@ -168,6 +199,7 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ),
       ),
+      
     );
   }
 }

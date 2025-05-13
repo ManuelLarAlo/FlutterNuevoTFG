@@ -1,4 +1,6 @@
+import 'package:clan_barber_club_andujar/services/database_service.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -93,13 +95,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (_formKey.currentState!.validate()) {
                       _formKey.currentState!.save();
-                      // Aquí puedes enviar los datos a Firebase o una API
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Cuenta creada correctamente')),
-                      );
+
+                      try {
+                        final db = DatabaseService();
+
+                        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                          email: email,
+                          password: password,
+                        );
+
+                        await db.guardarUsuario(
+                          nombre: name,
+                          apellidos: lastName,
+                          telefono: telefono,
+                        );
+
+                        if (!mounted) return;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Cuenta creada correctamente')),
+                          );
+                          Navigator.pop(context);
+                        });
+                      } catch (e) {
+                        if (!mounted) return;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error al crear cuenta: ${e.toString()}')),
+                          );
+                        });
+                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(

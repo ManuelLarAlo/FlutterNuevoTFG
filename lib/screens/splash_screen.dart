@@ -1,3 +1,4 @@
+import 'package:clan_barber_club_andujar/main.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -40,7 +41,10 @@ class SplashScreenState extends State<SplashScreen> {
 
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {  // Check if the widget is still mounted
-        Navigator.pushReplacementNamed(context, '/welcome');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AuthWrapper()),
+        );
       }
     });
   }
