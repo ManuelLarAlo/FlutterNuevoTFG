@@ -1,9 +1,44 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 
 class DatabaseService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+
+  Future<List<String>> obtenerTramosOcupados(DateTime fecha, ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception("No hay usuario autenticado");
+
+    final startOfDay = DateTime(fecha.year, fecha.month, fecha.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('citas')
+        .where('fecha', isGreaterThanOrEqualTo: startOfDay.toIso8601String())
+        .where('fecha', isLessThan: endOfDay.toIso8601String())
+        .get();
+
+    // Extraemos los tramos horarios ocupados
+    final tramosOcupados = snapshot.docs
+        .map((doc) => (doc.data()['tramoHorario'] as String))
+        .toList();
+
+    return tramosOcupados;
+  }
+
+  static String formatearFecha(String? fechaIso) {
+    if (fechaIso == null) return 'Desconocida';
+    try {
+      final fecha = DateTime.parse(fechaIso);
+      return DateFormat('MM-dd-yyyy').format(fecha);
+    } catch (e) {
+      return 'Formato inválido';
+    }
+  }
+
 
   Future<void> guardarUsuario({
     required String nombre,
@@ -39,6 +74,18 @@ class DatabaseService {
       'userId': user.uid,
       'fecha': fecha.toIso8601String(),
     });
+  }
+
+  Future<void> eliminarCita(String citaId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("No hay usuario autenticado");
+
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('citas')
+        .doc(citaId)
+        .delete();
   }
 
   Stream<List<Map<String, dynamic>>> obtenerCitasUsuario() {
