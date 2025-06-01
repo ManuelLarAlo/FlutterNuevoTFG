@@ -1,3 +1,5 @@
+import 'package:clan_barber_club_andujar/screens/admin_screen.dart';
+import 'package:clan_barber_club_andujar/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -29,7 +31,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: Image.asset(
-                    'barber_illustration.png',
+                    'assets/barber_illustration.png',
                     height: 200,
                   ),
                 ),
@@ -131,10 +133,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
                                         WidgetsBinding.instance.addPostFrameCallback((_) {
                                           Navigator.pop(context);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Inicio de sesión exitoso')),
-                                          );
-                                          // Aquí podrías redirigir a la pantalla principal
+
+                                          // Revisa el correo del usuario logueado
+                                          final userEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+
+                                          if (userEmail == 'manuellaraalos@gmail.com') {
+                                            Navigator.pushReplacement(
+                                              context,
+                                              MaterialPageRoute(builder: (context) => const AdminScreen()),
+                                            );
+                                          } else {
+                                            Navigator.pushReplacement(
+                                              context,
+                                              MaterialPageRoute(builder: (context) => const HomeScreen()),
+                                            );
+                                          }
                                         });
                                       } catch (e) {
                                         if (!mounted) return;

@@ -1,4 +1,7 @@
-import 'package:clan_barber_club_andujar/main.dart';
+import 'package:clan_barber_club_andujar/screens/admin_screen.dart';
+import 'package:clan_barber_club_andujar/screens/home_screen.dart';
+import 'package:clan_barber_club_andujar/screens/welcome_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -39,13 +42,27 @@ class SplashScreenState extends State<SplashScreen> {
       }
     });
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {  // Check if the widget is still mounted
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AuthWrapper()),
-        );
+    // Lógica para decidir a qué pantalla ir después de 3 segundos
+    Future.delayed(const Duration(seconds: 1), () async {
+      if (!mounted) return;
+
+      final user = FirebaseAuth.instance.currentUser;
+
+      Widget destino;
+
+      if (user == null) {
+        destino = const WelcomeScreen();
+      } else if (user.email == 'manuellaraalos@gmail.com') {
+        destino = const AdminScreen();
+      } else {
+        destino = const HomeScreen();
       }
+
+      // Redirigir
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => destino),
+      );
     });
   }
 

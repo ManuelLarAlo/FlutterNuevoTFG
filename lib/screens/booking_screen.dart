@@ -25,6 +25,12 @@ class BookingScreenState extends State<BookingScreen> {
     '10:30-11:00',
     // puedes añadir más
   ];
+
+  Future<bool> isDiaLleno(DateTime dia) async {
+    final tramosOcupados = await _db.obtenerTramosOcupados(dia);
+    return tramosDisponibles.every((tramo) => tramosOcupados.contains(tramo));
+  }
+
   
   final Map<String, double> serviciosConPrecio = {
     'Corte de pelo': 10.0,
@@ -129,12 +135,25 @@ class BookingScreenState extends State<BookingScreen> {
                     IconButton(
                       icon: const Icon(Icons.calendar_today, color: Colors.brown),
                       onPressed: () async {
+                        // Ajustar initialDate para que no sea fin de semana
+                        DateTime initialDateToShow = fecha;
+                        if (initialDateToShow.weekday == DateTime.saturday) {
+                          initialDateToShow = initialDateToShow.add(const Duration(days: 2)); // lunes
+                        } else if (initialDateToShow.weekday == DateTime.sunday) {
+                          initialDateToShow = initialDateToShow.add(const Duration(days: 1)); // lunes
+                        }
+
                         DateTime? picked = await showDatePicker(
                           context: context,
-                          initialDate: fecha,
+                          initialDate: initialDateToShow,
                           firstDate: DateTime.now(),
                           lastDate: DateTime(DateTime.now().year + 1),
+                          selectableDayPredicate: (day) {
+                            // Desactivar sábados y domingos
+                            return day.weekday != DateTime.saturday && day.weekday != DateTime.sunday;
+                          },
                         );
+
                         if (picked != null && picked != fecha) {
                           setState(() {
                             fecha = picked;

@@ -59,8 +59,6 @@ class HomeScreenState extends State<HomeScreen> {
               ? const Center(child: Text('Usuario no autenticado'))
               : StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user!.uid)
                       .collection('citas')
                       .where('userId', isEqualTo: user!.uid)
                       .snapshots(),
