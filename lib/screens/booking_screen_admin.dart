@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:clan_barber_club_andujar/services/database_service.dart';
 
-class BookingScreen extends StatefulWidget {
+class BookingScreenAdmin extends StatefulWidget {
   final DateTime? fechaPredefinida;
   final String? horarioPredefinido;
 
-  const BookingScreen(
+  const BookingScreenAdmin(
       {super.key, this.fechaPredefinida, this.horarioPredefinido});
 
   @override
-  BookingScreenState createState() => BookingScreenState();
+  BookingScreenAdminState createState() => BookingScreenAdminState();
 }
 
-class BookingScreenState extends State<BookingScreen> {
+class BookingScreenAdminState extends State<BookingScreenAdmin> {
   final _db = DatabaseService();
   final _formKey = GlobalKey<FormState>();
 
@@ -20,6 +20,9 @@ class BookingScreenState extends State<BookingScreen> {
   double precio = 0;
   String? horario;
   DateTime fecha = DateTime.now();
+
+  String nombreCliente = '';
+  String telefonoCliente = '';
 
   @override
   void initState() {
@@ -134,6 +137,45 @@ class BookingScreenState extends State<BookingScreen> {
                 readOnly: true,
                 enabled: false,
                 key: ValueKey(precio), // Fuerza a reconstruir con nuevo precio
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Nombre del cliente',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.brown),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Introduce el nombre del cliente';
+                  }
+                  return null;
+                },
+                onSaved: (value) => nombreCliente = value!.trim(),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Teléfono del cliente',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.brown),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Introduce el teléfono del cliente';
+                  }
+                  return null;
+                },
+                onSaved: (value) => telefonoCliente = value!.trim(),
               ),
               const SizedBox(height: 16),
               const Text('Selecciona una fecha',
@@ -255,11 +297,12 @@ class BookingScreenState extends State<BookingScreen> {
 
                       try {
                         await _db.agregarCita(
-                          nombreServicio: servicio,
-                          precio: precio,
-                          tramoHorario: horario!,
-                          fecha: fecha,
-                        );
+                            nombreServicio: servicio,
+                            precio: precio,
+                            tramoHorario: horario!,
+                            fecha: fecha,
+                            nombreCliente: nombreCliente,
+                            telefonoCliente: telefonoCliente);
 
                         if (context.mounted) {
                           final addToCalendar = await showDialog<bool>(
@@ -293,7 +336,6 @@ class BookingScreenState extends State<BookingScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Cita agregada')),
                             );
-
                             Navigator.pop(context);
                           }
                         }

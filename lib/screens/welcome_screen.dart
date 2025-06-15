@@ -2,6 +2,8 @@ import 'package:clan_barber_club_andujar/screens/admin_screen.dart';
 import 'package:clan_barber_club_andujar/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:clan_barber_club_andujar/services/auth_service.dart';
+
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -11,6 +13,8 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
+  final AuthService _authService = AuthService();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -195,6 +199,52 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     minimumSize: const Size(double.infinity, 50),
                   ),
                   child: const Text('Registrarse', style: TextStyle(fontSize: 18)),
+                ),
+                const SizedBox(height: 20),
+
+                //Botón de login con google
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.login, color: Color(0xFFF5F5DC)),
+                  label: const Text('Iniciar sesión con Google', style: TextStyle(fontSize: 18, color: Color(0xFFF5F5DC))),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.brown[700],
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                  onPressed: () async {
+                    final user = await _authService.signInWithGoogle();
+
+                    if (user != null) {
+                      final userEmail = user.email ?? '';
+
+                      if (!mounted) return;
+
+                      if (userEmail == 'manuellaraalos@gmail.com') {
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminScreen()),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const HomeScreen()),
+                          );
+                        }
+                      }
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Inicio de sesión con Google cancelado o fallido')),
+                      );
+                      }
+                    }
+                  },
                 ),
               ],
             ),

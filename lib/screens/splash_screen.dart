@@ -14,28 +14,12 @@ class SplashScreen extends StatefulWidget {
 class SplashScreenState extends State<SplashScreen> {
   double _opacity = 0;
   
- /*
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {
-        _opacity = 1;
-      });
-    });
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.pushReplacementNamed(context, '/welcome');
-    });
-  }
-  */
-
-  //Codigo sustituto del de arriba para quitar el warning
   @override
   void initState() {
     super.initState();
 
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {  // Check if the widget is still mounted
+      if (mounted) {  
         setState(() {
           _opacity = 1;
         });
@@ -43,7 +27,7 @@ class SplashScreenState extends State<SplashScreen> {
     });
 
     // Lógica para decidir a qué pantalla ir después de 3 segundos
-    Future.delayed(const Duration(seconds: 1), () async {
+    Future.delayed(const Duration(seconds: 3), () async {
       if (!mounted) return;
 
       final user = FirebaseAuth.instance.currentUser;

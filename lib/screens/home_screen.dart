@@ -15,12 +15,59 @@ class HomeScreenState extends State<HomeScreen> {
   final user = FirebaseAuth.instance.currentUser;
   bool _isMenuOpen = false;
 
+  final TextEditingController _telefonoController = TextEditingController();
+  bool _isEditingTelefono = false;
+  bool _isSavingTelefono = false;
+
   Future<DocumentSnapshot> getUserData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       return await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
     }
     throw 'No user logged in';
+  }
+
+    Future<void> _updateTelefono(String telefono) async {
+    if (user == null) return;
+
+    final telefonoSinEspacios = telefono.replaceAll(' ', '');
+    final esValido = RegExp(r'^\d{9,}$').hasMatch(telefonoSinEspacios);
+
+    if (!esValido) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('El teléfono debe tener al menos 9 dígitos y solo números')),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _isSavingTelefono = true;
+    });
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user?.uid).update({
+        'telefono': telefono,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Teléfono actualizado')),
+        );
+      }
+      setState(() {
+        _isEditingTelefono = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al actualizar teléfono: $e')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSavingTelefono = false;
+      });
+    }
   }
 
   @override
@@ -42,7 +89,7 @@ class HomeScreenState extends State<HomeScreen> {
             const Text('Clan Barber Club', style: TextStyle(fontSize: 20, color: Color(0xFFF5F5DC))),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.settings),
+              icon: const Icon(Icons.settings, color: Color(0xFFF5F5DC)),
               onPressed: () {
                 setState(() {
                   _isMenuOpen = !_isMenuOpen;
@@ -179,13 +226,55 @@ class HomeScreenState extends State<HomeScreen> {
                     return Text('Error: ${snapshot.error}');
                   }
                   if (snapshot.hasData) {
+                    if (!snapshot.data!.exists) {
+                      return const Text('No hay datos disponibles para este usuario.');
+                    }
                     var userData = snapshot.data!.data() as Map<String, dynamic>;
+                    if (!_isEditingTelefono) {
+                      _telefonoController.text = userData['telefono'] ?? '';
+                    }
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Nombre: ${userData['nombre'] ?? "No disponible"}', style: const TextStyle(fontSize: 16)),
                         Text('Correo: ${userData['email'] ?? "No disponible"}', style: const TextStyle(fontSize: 16)),
-                        Text('Número: ${userData['telefono'] ?? "No disponible"}', style: const TextStyle(fontSize: 16)),
+                                                // Campo teléfono editable
+                        Row(
+                          children: [
+                            const Text('Número: ', style: TextStyle(fontSize: 16)),
+                            Expanded(
+                              child: TextField(
+                                controller: _telefonoController,
+                                enabled: _isEditingTelefono && !_isSavingTelefono,
+                                keyboardType: TextInputType.phone,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _isEditingTelefono
+                                ? _isSavingTelefono
+                                    ? const CircularProgressIndicator()
+                                    : IconButton(
+                                        icon: const Icon(Icons.check, color: Colors.green),
+                                        onPressed: () {
+                                          String nuevoTelefono = _telefonoController.text.trim();
+                                          _updateTelefono(nuevoTelefono);
+                                        },
+                                      )
+                                : IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.brown),
+                                    onPressed: () {
+                                      setState(() {
+                                        _isEditingTelefono = true;
+                                      });
+                                    },
+                                  ),
+                          ],
+                        ),
                         const SizedBox(height: 20),
                         ElevatedButton(
                           onPressed: () async {
@@ -223,6 +312,23 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               onPressed: () {
+                if (_telefonoController.text.trim().isEmpty) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Número de teléfono requerido'),
+                      content: const Text(
+                          'Por favor, configure su número de teléfono en el menú antes de pedir una cita.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Aceptar'),
+                        ),
+                      ],
+                    ),
+                  );
+                  return; // No navegamos a BookingScreen
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const BookingScreen()),

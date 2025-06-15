@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DatabaseService {
   final _db = FirebaseFirestore.instance;
@@ -16,7 +17,6 @@ class DatabaseService {
 
     final snapshot = await _db
         .collection('citas')
-        
         .where('fecha', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .where('fecha', isLessThan: Timestamp.fromDate(endOfDay))
         .get();
@@ -68,12 +68,13 @@ class DatabaseService {
   }
 
   // Agrega una cita en colección raíz 'citas'
-  Future<void> agregarCita({
-    required String nombreServicio,
-    required double precio,
-    required String tramoHorario,
-    required DateTime fecha,
-  }) async {
+  Future<void> agregarCita(
+      {required String nombreServicio,
+      required double precio,
+      required String tramoHorario,
+      required DateTime fecha,
+      String? nombreCliente,
+      String? telefonoCliente}) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception("No hay usuario autenticado");
     await _db.collection('citas').add({
@@ -82,6 +83,8 @@ class DatabaseService {
       'tramoHorario': tramoHorario,
       'userId': user.uid,
       'fecha': Timestamp.fromDate(fecha),
+      'nombreCliente': nombreCliente,
+      'telefonoCliente': telefonoCliente,
     });
   }
 
@@ -105,6 +108,22 @@ class DatabaseService {
     await citaRef.delete();
   }
 
+  Future<void> eliminarCitaAdmin(String citaId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("No hay usuario autenticado");
+
+    final citaRef = _db.collection('citas').doc(citaId);
+    final citaSnapshot = await citaRef.get();
+
+    if (!citaSnapshot.exists) {
+      throw Exception("La cita no existe");
+    }
+
+    // No comprobamos userId, el admin puede eliminar cualquier cita
+    await citaRef.delete();
+  }
+
+  /*
   // Stream para obtener las citas del usuario actual
   Stream<List<Map<String, dynamic>>> obtenerCitasUsuario() {
     final user = _auth.currentUser;
@@ -156,15 +175,21 @@ class DatabaseService {
     await _db.collection('citas').doc(citaId).delete();
   }
 
+  */
+
   // Obtener citas de todos los usuarios para la semana de la fecha indicada
-  Future<List<Map<String, dynamic>>> obtenerCitasPorSemana(DateTime fecha) async {
+  Future<List<Map<String, dynamic>>> obtenerCitasPorSemana(
+      DateTime fecha) async {
     final fechaSinHora = DateTime(fecha.year, fecha.month, fecha.day);
-    final inicioSemana = fechaSinHora.subtract(Duration(days: fecha.weekday - 1));
-    final finSemana = inicioSemana.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
+    final inicioSemana =
+        fechaSinHora.subtract(Duration(days: fecha.weekday - 1));
+    final finSemana = inicioSemana.add(const Duration(
+        days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
 
     final snapshot = await _db
         .collection('citas')
-        .where('fecha', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioSemana))
+        .where('fecha',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(inicioSemana))
         .where('fecha', isLessThanOrEqualTo: Timestamp.fromDate(finSemana))
         .get();
 
@@ -182,14 +207,13 @@ class DatabaseService {
 
   final Map<String, Map<String, dynamic>> usuariosCache = {};
 
-
-  // Cambia de _cargarUsuarios a cargarUsuarios (pública)
   Future<void> cargarUsuarios(List<String> userIds) async {
-    final idsPorCargar = userIds.where((id) => !usuariosCache.containsKey(id)).toList();
+    final idsPorCargar =
+        userIds.where((id) => !usuariosCache.containsKey(id)).toList();
     if (idsPorCargar.isEmpty) return;
 
     final usuariosSnapshot = await FirebaseFirestore.instance
-        .collection('users') // ojo que en tu código 'usuarios' y 'users' está inconsistente, usa 'users' si así guardas.
+        .collection('users')
         .where(FieldPath.documentId, whereIn: idsPorCargar)
         .get();
 
@@ -202,5 +226,58 @@ class DatabaseService {
   bool isAdmin(User? user) {
     return user?.email == 'manuellaraalos@gmail.com';
   }
-  
+
+  //Metodos de integración de google calendar
+
+  Future<void> abrirGoogleCalendar({
+    required String titulo,
+    required DateTime fecha,
+    required String tramoHorario,
+  }) async {
+    // Extraer hora de inicio y fin del tramo
+    final partes = tramoHorario.split(' - ');
+    final horaInicio = partes[0];
+    final horaFin = partes[1];
+
+    // Parsear horas a DateTime
+    final fechaInicio = DateTime(
+      fecha.year,
+      fecha.month,
+      fecha.day,
+      int.parse(horaInicio.split(':')[0]),
+      int.parse(horaInicio.split(':')[1]),
+    );
+
+    final fechaFin = DateTime(
+      fecha.year,
+      fecha.month,
+      fecha.day,
+      int.parse(horaFin.split(':')[0]),
+      int.parse(horaFin.split(':')[1]),
+    );
+
+    final String url = Uri.encodeFull(
+      'https://www.google.com/calendar/render?action=TEMPLATE'
+      '&text=$titulo'
+      '&dates=${_formatearParaGoogleCalendar(fechaInicio)}/${_formatearParaGoogleCalendar(fechaFin)}'
+      '&details=Tu cita en Clan Barber Club Andújar'
+      '&location=Clan Barber Club Andújar',
+    );
+
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      throw 'No se pudo abrir Google Calendar';
+    }
+  }
+
+  String _formatearParaGoogleCalendar(DateTime dateTime) {
+    return '${dateTime
+            .toUtc()
+            .toIso8601String()
+            .replaceAll('-', '')
+            .replaceAll(':', '')
+            .split('.')
+            .first}Z';
+  }
 }

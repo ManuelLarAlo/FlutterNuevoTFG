@@ -1,8 +1,11 @@
+import 'package:clan_barber_club_andujar/screens/booking_screen_admin.dart';
 import 'package:clan_barber_club_andujar/services/database_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:collection/collection.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -12,95 +15,81 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  DateTime _selectedDate = DateTime.now();
-  final DatabaseService _dbService = DatabaseService();
-  bool _mostrarVistaSemanal = false;
-  Set<DateTime> fechasConCitas = {};
+  final user = FirebaseAuth.instance.currentUser;
+  bool _isMenuOpen = false;
 
-  List<Map<String, dynamic>> _citas = [];
-  bool _isLoading = true;
-  String? _error;
+  Future<DocumentSnapshot> getUserData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      return await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+    }
+    throw 'No user logged in';
+  }
+
+  final DatabaseService _databaseService = DatabaseService();
+  DateTime _currentWeekStart = DateTime.now();
+  List<String> horarios = [
+    "10:00 - 10:30",
+    "10:30 - 11:00",
+    "11:00 - 11:30",
+    "11:30 - 12:00",
+    "12:00 - 12:30",
+    "12:30 - 13:00",
+    "13:00 - 13:30",
+    "13:30 - 14:00",
+    "16:00 - 16:30",
+    "16:30 - 17:00",
+    "17:00 - 17:30",
+    "17:30 - 18:00",
+    "18:00 - 18:30",
+    "18:30 - 19:00",
+    "19:00 - 19:30",
+    "19:30 - 20:00",
+  ];
+  Map<String, List<Map<String, dynamic>>> citasSemana = {};
 
   @override
   void initState() {
     super.initState();
-    _cargarCitas();
+    initializeDateFormatting('es_ES', null);
+    _loadCitas();
   }
 
-  Future<void> _cargarCitas() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final citas = _mostrarVistaSemanal
-          ? await _dbService.obtenerCitasPorSemana(_selectedDate)
-          : await _dbService.obtenerCitasPorFecha(_selectedDate);
-
-      final userIds = citas
-          .map((cita) => cita['userId'] as String?)
-          .whereType<String>()
-          .toSet()
-          .toList();
-
-      await _dbService.cargarUsuarios(userIds);
-
-      final fechas = citas.map((cita) {
-        final fechaData = cita['fecha'];
-        DateTime fecha;
-        if (fechaData is Timestamp) {
-          fecha = fechaData.toDate();
-        } else if (fechaData is DateTime) {
-          fecha = fechaData;
-        } else {
-          fecha = DateTime.now();
-        }
-        return DateTime(fecha.year, fecha.month, fecha.day);
-      }).toSet();
-
-      setState(() {
-        _citas = citas;
-        fechasConCitas = fechas;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+  void _loadCitas() async {
+    final citas =
+        await _databaseService.obtenerCitasPorSemana(_currentWeekStart);
+    final mapa = <String, List<Map<String, dynamic>>>{};
+    final userIdsSet = <String>{};
+    for (var cita in citas) {
+      final fecha = cita['fecha'] as DateTime;
+      final key = DateFormat('yyyy-MM-dd').format(fecha);
+      mapa.putIfAbsent(key, () => []).add(cita);
+      userIdsSet.add(cita['userId'] as String);
     }
+    await _databaseService.cargarUsuarios(userIdsSet.toList());
+    setState(() => citasSemana = mapa);
   }
 
-  // Cuando cambies vista o fecha, recarga las citas:
-  void _onToggleVista() {
+  void _changeWeek(int offset) {
     setState(() {
-      _mostrarVistaSemanal = !_mostrarVistaSemanal;
+      _currentWeekStart = _currentWeekStart.add(Duration(days: offset * 7));
     });
-    _cargarCitas();
-  }
-
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    if (_mostrarVistaSemanal) {
-      final monday =
-          selectedDay.subtract(Duration(days: selectedDay.weekday - 1));
-      setState(() {
-        _selectedDate = monday;
-      });
-    } else {
-      setState(() {
-        _selectedDate = selectedDay;
-      });
-    }
-    _cargarCitas();
+    _loadCitas();
   }
 
   @override
   Widget build(BuildContext context) {
+    final diasSemana = List.generate(
+        7,
+        (index) => _currentWeekStart
+            .subtract(Duration(days: _currentWeekStart.weekday - 1 - index)));
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5DC),
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         backgroundColor: Colors.brown[800],
         title: Row(
           children: [
@@ -111,120 +100,364 @@ class _AdminScreenState extends State<AdminScreen> {
               fit: BoxFit.cover,
             ),
             const SizedBox(width: 10),
-            const Text('Admin', style: TextStyle(fontSize: 20)),
+            const Text('Clan Barber Club',
+                style: TextStyle(fontSize: 20, color: Color(0xFFF5F5DC))),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-                if (context.mounted) {
-                  Navigator.pushReplacementNamed(context, '/');
-                }
+              icon: const Icon(Icons.settings, color: Color(0xFFF5F5DC)),
+              onPressed: () {
+                setState(() {
+                  _isMenuOpen = !_isMenuOpen;
+                });
               },
             ),
           ],
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          icon: Icon(_mostrarVistaSemanal
-                              ? Icons.calendar_view_day
-                              : Icons.calendar_view_week),
-                          label: Text(
-                              _mostrarVistaSemanal ? 'Vista diaria' : 'Vista semanal'),
-                          onPressed: _onToggleVista,
-                        ),
-                      ],
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.brown[700]),
+                      onPressed: () => _changeWeek(-1),
+                      child: const Icon(Icons.arrow_back,
+                          color: Color(0xFFF5F5DC)),
                     ),
-                    TableCalendar(
-                      enabledDayPredicate: (day) =>
-                          day.weekday != DateTime.saturday &&
-                          day.weekday != DateTime.sunday,
-                      startingDayOfWeek: StartingDayOfWeek.monday,
-                      focusedDay: _selectedDate,
-                      firstDay: DateTime.utc(2020, 1, 1),
-                      lastDay: DateTime.utc(2030, 12, 31),
-                      selectedDayPredicate: (day) => isSameDay(day, _selectedDate),
-                      onDaySelected: _onDaySelected,
-                      calendarBuilders: CalendarBuilders(
-                        defaultBuilder: (context, day, focusedDay) {
-                          if (_mostrarVistaSemanal) {
-                            final monday = _selectedDate
-                                .subtract(Duration(days: _selectedDate.weekday - 1));
-                            final sunday = monday.add(const Duration(days: 6));
-                            if (!day.isBefore(monday) && !day.isAfter(sunday)) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.brown.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                margin: const EdgeInsets.all(6.0),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  '${day.day}',
-                                  style: const TextStyle(
-                                    color: Colors.brown,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 30),
                     Text(
-                      'Citas',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.brown[800],
-                      ),
+                      'Semana del ${DateFormat('dd MMM', 'es_ES').format(diasSemana.first)} al ${DateFormat('dd MMM', 'es_ES').format(diasSemana.last)}',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
                     ),
-                    // Aquí el listado o loading o error:
-                    _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _error != null
-                            ? Center(child: Text('Error: $_error'))
-                            : _citas.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'No hay citas para esta fecha',
-                                      style: TextStyle(fontSize: 16),
-                                    ),
-                                  )
-                                : _mostrarVistaSemanal
-                                    ? SizedBox(
-                                        height: 400, // Puedes ajustar esta altura si quieres
-                                        child: _buildVistaSemanal(_citas),
-                                      )
-                                    : ListView.builder(
-                                        shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
-                                        itemCount: _citas.length,
-                                        itemBuilder: (context, index) =>
-                                            _buildCitaTile(_citas[index]),
-                                      ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.brown[700]),
+                      onPressed: () => _changeWeek(1),
+                      child: const Icon(Icons.arrow_forward,
+                          color: Color(0xFFF5F5DC)),
+                    ),
                   ],
                 ),
               ),
-            );
-          },
-        ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints:
+                            BoxConstraints(minWidth: constraints.maxWidth),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.vertical,
+                          child: Table(
+                            defaultVerticalAlignment:
+                                TableCellVerticalAlignment.middle,
+                            columnWidths: {
+                              0: const FlexColumnWidth(
+                                  2), // Horario columna un poco más ancha
+                              // Para las demás columnas usa FlexColumnWidth para adaptar
+                              for (int i = 1; i <= 7; i++)
+                                i: const FlexColumnWidth(1),
+                            },
+                            border:
+                                TableBorder.all(color: Colors.brown.shade200),
+                            children: [
+                              TableRow(
+                                children: [
+                                  const TableCell(
+                                    child: Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: Text(
+                                          "Horario",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  ...diasSemana.map((dia) => Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text(
+                                            DateFormat.E('es_ES').format(dia),
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ))
+                                ],
+                              ),
+                              ...horarios.map((horario) {
+                                return TableRow(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text(horario),
+                                    ),
+                                    ...diasSemana.map((dia) {
+                                      final fechaClave =
+                                          DateFormat('yyyy-MM-dd').format(dia);
+                                      final citaDelDia = citasSemana[fechaClave]
+                                          ?.firstWhereOrNull(
+                                        (cita) =>
+                                            cita['tramoHorario'] == horario,
+                                      );
+                                      final tieneCita = citaDelDia != null &&
+                                          citaDelDia.isNotEmpty;
+
+                                      final esFinDeSemana =
+                                          dia.weekday == DateTime.saturday ||
+                                              dia.weekday == DateTime.sunday;
+
+                                      final currentUser =
+                                          FirebaseAuth.instance.currentUser;
+                                      String nombreCompleto = '';
+                                      String correo = '';
+                                      String telefono = '';
+                                      if (citaDelDia != null) {
+                                        final userId =
+                                            citaDelDia['userId'] as String?;
+                                        if (userId != null) {
+                                          final usuario = _databaseService
+                                              .usuariosCache[userId];
+
+                                          if (currentUser != null &&
+                                              userId == currentUser.uid) {
+                                            nombreCompleto =
+                                                citaDelDia['nombreCliente'] ??
+                                                    'Admin';
+                                            correo =
+                                                'Correo admin no disponible';
+                                            telefono =
+                                                citaDelDia['telefonoCliente'] ??
+                                                    'Sin teléfono';
+                                          } else {
+                                            nombreCompleto = usuario != null
+                                                ? '${usuario['nombre']} ${usuario['apellidos']}'
+                                                : 'Usuario desconocido';
+                                            correo = usuario != null
+                                                ? '${usuario['email']}'
+                                                : 'Sin correo';
+                                            telefono = usuario != null
+                                                ? '${usuario['telefono']}'
+                                                : 'Sin telefono';
+                                          }
+                                        } else {
+                                          nombreCompleto =
+                                              'Usuario no especificado';
+                                        }
+                                      }
+                                      return GestureDetector(
+                                        onTap: esFinDeSemana
+                                            ? null
+                                            : () async {
+                                                if (tieneCita) {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (_) => AlertDialog(
+                                                      title: const Text(
+                                                          "Detalles de la cita"),
+                                                      content: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                              "Servicio: ${citaDelDia['nombreServicio']}"),
+                                                          Text(
+                                                              "Precio: ${citaDelDia['precio']} €"),
+                                                          Text(
+                                                              "Horario: ${citaDelDia['tramoHorario']}"),
+                                                          Text(
+                                                              "Usuario: $nombreCompleto"),
+                                                          Text(
+                                                              "Correo: $correo"),
+                                                          Text(
+                                                              "Teléfono: $telefono"),
+                                                        ],
+                                                      ),
+                                                      actions: [
+                                                        IconButton(
+                                                          icon: const Icon(
+                                                              Icons.delete,
+                                                              color:
+                                                                  Colors.red),
+                                                          tooltip:
+                                                              'Eliminar cita',
+                                                          onPressed: () async {
+                                                            Navigator.of(
+                                                                    context)
+                                                                .pop(); // Cierra el diálogo
+                                                            try {
+                                                              await _databaseService
+                                                                  .eliminarCitaAdmin(
+                                                                      citaDelDia[
+                                                                              'id']
+                                                                          as String);
+                                                              if (context
+                                                                  .mounted) {
+                                                                ScaffoldMessenger.of(
+                                                                        context)
+                                                                    .showSnackBar(
+                                                                  const SnackBar(
+                                                                      content: Text(
+                                                                          'Cita eliminada correctamente')),
+                                                                );
+                                                              }
+                                                              _loadCitas(); // Recarga la lista de citas después de eliminar
+                                                            } catch (e) {
+                                                              if (context
+                                                                  .mounted) {
+                                                                ScaffoldMessenger.of(
+                                                                        context)
+                                                                    .showSnackBar(
+                                                                  SnackBar(
+                                                                      content: Text(
+                                                                          'Error al eliminar cita: $e')),
+                                                                );
+                                                              }
+                                                            }
+                                                          },
+                                                        ),
+                                                        TextButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                  context),
+                                                          child: const Text(
+                                                              "Cerrar"),
+                                                        )
+                                                      ],
+                                                    ),
+                                                  );
+                                                } else {
+                                                  await Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) =>
+                                                          BookingScreenAdmin(
+                                                        fechaPredefinida: dia,
+                                                        horarioPredefinido:
+                                                            horario,
+                                                      ),
+                                                    ),
+                                                  );
+                                                  _loadCitas();
+                                                }
+                                              },
+                                        child: Container(
+                                          height: 40,
+                                          color: esFinDeSemana
+                                              ? Colors.grey[300]
+                                              : tieneCita
+                                                  ? Colors.green[300]
+                                                  : Colors.transparent,
+                                          child: Center(
+                                            child: Text(
+                                              tieneCita ? nombreCompleto : '',
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          // Fondo oscuro para el menú
+          if (_isMenuOpen)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isMenuOpen = false;
+                });
+              },
+              child: Container(color: Colors.black.withOpacity(0.5)),
+            ),
+
+          // Menú lateral animado
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: 0,
+            bottom: 0,
+            right: _isMenuOpen ? 0 : -250,
+            child: Container(
+              width: 250,
+              color: const Color(0xFFF5F5DC),
+              padding: const EdgeInsets.all(16),
+              child: FutureBuilder<DocumentSnapshot>(
+                future: getUserData(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  }
+                  if (snapshot.hasError) {
+                    return Text('Error: ${snapshot.error}');
+                  }
+                  if (snapshot.hasData) {
+                    var userData =
+                        snapshot.data!.data() as Map<String, dynamic>;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Nombre: ${userData['nombre'] ?? "No disponible"}',
+                            style: const TextStyle(fontSize: 16)),
+                        Text('Correo: ${userData['email'] ?? "No disponible"}',
+                            style: const TextStyle(fontSize: 16)),
+                        Text(
+                            'Número: ${userData['telefono'] ?? "No disponible"}',
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () async {
+                            await FirebaseAuth.instance.signOut();
+                            if (context.mounted) {
+                              Navigator.pushReplacementNamed(context, '/');
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.brown[700],
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: const Text('Cerrar sesión',
+                              style: TextStyle(
+                                  fontSize: 18, color: Color(0xFFF5F5DC))),
+                        ),
+                      ],
+                    );
+                  } else {
+                    return const Text('No hay datos del usuario');
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomAppBar(
         color: Colors.brown[800],
@@ -238,174 +471,5 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildVistaSemanal(List<Map<String, dynamic>> citas) {
-    final citasPorDia = <DateTime, List<Map<String, dynamic>>>{};
-    for (final cita in citas) {
-      final fechaData = cita['fecha'];
-      DateTime fecha;
-      if (fechaData is Timestamp) {
-        fecha = fechaData.toDate();
-      } else if (fechaData is DateTime) {
-        fecha = fechaData;
-      } else {
-        fecha = DateTime.now();
-      }
-      final soloFecha = DateTime(fecha.year, fecha.month, fecha.day);
-      citasPorDia.putIfAbsent(soloFecha, () => []).add(cita);
-    }
-
-    final diasOrdenados = citasPorDia.keys.toList()..sort();
-
-    return ListView.builder(
-      itemCount: diasOrdenados.length,
-      itemBuilder: (context, index) {
-        final dia = diasOrdenados[index];
-        final citasDelDia = citasPorDia[dia]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${dia.day}/${dia.month}/${dia.year}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            ...citasDelDia.map((cita) => _buildCitaTile(cita)),
-            const Divider(),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildCitaTile(Map<String, dynamic> cita) {
-    final userId = cita['userId'] as String?;
-    final userData = userId != null ? _dbService.usuariosCache[userId] : null;
-
-    final userNombre =
-        userData != null ? userData['nombre'] ?? 'Desconocido' : 'Desconocido';
-    final userEmail =
-        userData != null ? userData['email'] ?? 'Sin email' : 'Sin email';
-    final userApellidos = userData != null
-        ? userData['apellidos'] ?? 'Sin apellidos'
-        : 'Sin apellidos';
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        tileColor: Colors.white,
-        leading: const Icon(Icons.calendar_today, color: Colors.brown),
-        title: Text('Servicio: ${cita['nombreServicio'] ?? 'N/A'}'),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Usuario: $userNombre $userApellidos'),
-            Text('Email: $userEmail'),
-            Text('Horario: ${cita['tramoHorario'] ?? 'N/A'}'),
-            Text('Precio: ${cita['precio'] ?? 'N/A'}€'),
-          ],
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('¿Eliminar cita?'),
-                content: const Text(
-                    '¿Estás seguro de que deseas eliminar esta cita?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancelar'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Eliminar',
-                        style: TextStyle(color: Colors.red)),
-                  ),
-                ],
-              ),
-            );
-            if (confirm == true) {
-              try {
-                await FirebaseFirestore.instance
-                    .collection('citas')
-                    .doc(cita['id'])
-                    .delete();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Cita eliminada')),
-                  );
-
-                  setState(() {
-                    // Quitar cita eliminada del listado local
-                    _citas
-                        .removeWhere((element) => element['id'] == cita['id']);
-
-                    // También actualizar fechasConCitas por si la cita eliminada era la única en ese día
-                    final fechas = _citas.map((c) {
-                      final fechaData = c['fecha'];
-                      DateTime fecha;
-                      if (fechaData is Timestamp) {
-                        fecha = fechaData.toDate();
-                      } else if (fechaData is DateTime) {
-                        fecha = fechaData;
-                      } else {
-                        fecha = DateTime.now();
-                      }
-                      return DateTime(fecha.year, fecha.month, fecha.day);
-                    }).toSet();
-                    fechasConCitas = fechas;
-                  });
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              }
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> obtenerCitasConUsuarios() async {
-    final citas = _mostrarVistaSemanal
-        ? await _dbService.obtenerCitasPorSemana(_selectedDate)
-        : await _dbService.obtenerCitasPorFecha(_selectedDate);
-
-    final userIds = citas
-        .map((cita) => cita['userId'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList();
-
-    await _dbService.cargarUsuarios(userIds);
-
-    // Aquí está el problema:
-    setState(() {
-      fechasConCitas = citas.map((cita) {
-        final fechaData = cita['fecha'];
-        DateTime fecha;
-        if (fechaData is Timestamp) {
-          fecha = fechaData.toDate();
-        } else if (fechaData is DateTime) {
-          fecha = fechaData;
-        } else {
-          fecha = DateTime.now();
-        }
-        return DateTime(fecha.year, fecha.month, fecha.day);
-      }).toSet();
-    });
-
-    return citas;
   }
 }
